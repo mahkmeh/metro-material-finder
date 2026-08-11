@@ -1,17 +1,33 @@
-export default async function handler(req, res) {
-  if (req.method === 'POST') {
-    try {
-      const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-      console.log('METRO_FEEDBACK', JSON.stringify({ ...body, receivedAt: new Date().toISOString() }));
-      return res.status(200).json({ ok: true });
-    } catch (error) {
-      console.error('METRO_FEEDBACK_ERROR', error);
-      return res.status(400).json({ ok: false, error: 'Invalid feedback' });
+const { put } = require('@vercel/blob');
+
+module.exports = async function handler(req, res) {
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', 'POST');
+    return res.status(405).json({ ok: false, error: 'Method not allowed' });
+  }
+
+  try {
+    const feedback = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+
+    if (!feedback || typeof feedback !== 'object') {
+      return res.status(400).json({ ok: false, error: 'Invalid feedback payload' });
     }
+
+    const record = {
+      ...feedback,
+      receivedAt: new Date().toISOString()
+    };
+
+    const pathname = `feedback/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.json`;
+
+    const blob = await put(pathname, JSON.stringify(record, null, 2), {
+      access: 'public',
+      contentType: 'application/json'
+    });
+
+    return res.status(200).json({ ok: true, pathname: blob.pathname });
+  } catch (error) {
+    console.error('Feedback storage failed:', error);
+    return res.status(500).json({ ok: false, error: 'Unable to save feedback' });
   }
-  if (req.method === 'GET') {
-    return res.status(200).json({ ok: true, message: 'Feedback endpoint is active. Feedback records are captured in Vercel runtime logs.' });
-  }
-  res.setHeader('Allow', ['GET', 'POST']);
-  return res.status(405).json({ ok: false });
-}
+};
