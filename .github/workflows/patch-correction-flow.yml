@@ -1,0 +1,55 @@
+name: Add correction feedback flow
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch Material Finder correction flow
+        shell: python
+        run: |
+          from pathlib import Path
+
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+
+          if 'function chooseCandidate' in s:
+              print('Correction flow already patched.')
+              raise SystemExit(0)
+
+          old = '<button onclick="renderBest(lastResults[${idx}],lastResults)">Choose</button>'
+          new = '<button onclick="chooseCandidate(lastResults[${idx}])">Choose</button>'
+          if old not in s:
+              raise SystemExit('Could not find candidate Choose button')
+          s = s.replace(old, new, 1)
+
+          marker = 'function useExample(x){document.getElementById("q").value=x;findMaterial()}'
+          addition = r'''function chooseCandidate(item){
+  const predicted=lastResults&&lastResults.length?lastResults[0].r:null;
+  save({query:lastQuery,parsed,predictedMaterial:predicted,correctedMaterial:item.r,correctedSku:item.r&&item.r.Sku,correct:false,correction:true,reason:"user_selected_candidate",at:new Date().toISOString(),engine:"v3"});
+  renderBest(item,lastResults);
+  const p=document.getElementById("panel");
+  const actions=p.querySelector(".actions");
+  if(actions){actions.insertAdjacentHTML("beforebegin",'<div class="note" style="text-align:left;margin-top:12px">Correction saved — this selection will be used as learning data.</div>');}
+}
+'''
+          if marker not in s:
+              raise SystemExit('Could not find insertion marker')
+          s = s.replace(marker, addition + marker, 1)
+          p.write_text(s, encoding='utf-8')
+
+      - name: Commit patch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html
+          if git diff --cached --quiet; then echo 'No changes'; exit 0; fi
+          git commit -m 'Add candidate correction feedback flow'
+          git push
