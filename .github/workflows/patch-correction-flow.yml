@@ -2,7 +2,8 @@ name: Add correction feedback flow
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
 
 permissions:
   contents: write
@@ -13,10 +14,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Patch Material Finder correction flow
-        shell: python
         run: |
+          python - <<'PY'
           from pathlib import Path
-
           p = Path('index.html')
           s = p.read_text(encoding='utf-8')
 
@@ -24,27 +24,19 @@ jobs:
               print('Correction flow already patched.')
               raise SystemExit(0)
 
-          old = '<button onclick="renderBest(lastResults[${idx}],lastResults)">Choose</button>'
-          new = '<button onclick="chooseCandidate(lastResults[${idx}])">Choose</button>'
+          old = bytes.fromhex('3c627574746f6e206f6e636c69636b3d2272656e64657242657374286c617374526573756c74735b247b6964787d5d2c6c617374526573756c747329223e43686f6f73653c2f627574746f6e3e').decode()
+          new = bytes.fromhex('3c627574746f6e206f6e636c69636b3d2263686f6f736543616e646964617465286c617374526573756c74735b247b6964787d5d29223e43686f6f73653c2f627574746f6e3e').decode()
           if old not in s:
               raise SystemExit('Could not find candidate Choose button')
           s = s.replace(old, new, 1)
 
-          marker = 'function useExample(x){document.getElementById("q").value=x;findMaterial()}'
-          addition = r'''function chooseCandidate(item){
-  const predicted=lastResults&&lastResults.length?lastResults[0].r:null;
-  save({query:lastQuery,parsed,predictedMaterial:predicted,correctedMaterial:item.r,correctedSku:item.r&&item.r.Sku,correct:false,correction:true,reason:"user_selected_candidate",at:new Date().toISOString(),engine:"v3"});
-  renderBest(item,lastResults);
-  const p=document.getElementById("panel");
-  const actions=p.querySelector(".actions");
-  if(actions){actions.insertAdjacentHTML("beforebegin",'<div class="note" style="text-align:left;margin-top:12px">Correction saved — this selection will be used as learning data.</div>');}
-}
-'''
+          marker = bytes.fromhex('66756e6374696f6e207573654578616d706c652878297b646f63756d656e742e676574456c656d656e744279496428227122292e76616c75653d783b66696e644d6174657269616c28297d').decode()
+          addition = bytes.fromhex('66756e6374696f6e2063686f6f736543616e646964617465286974656d297b0a2020636f6e7374207072656469637465643d6c617374526573756c747326266c617374526573756c74732e6c656e6774683f6c617374526573756c74735b305d2e723a6e756c6c3b0a202073617665287b71756572793a6c61737451756572792c7061727365642c7072656469637465644d6174657269616c3a7072656469637465642c636f727265637465644d6174657269616c3a6974656d2e722c636f72726563746564536b753a6974656d2e7226266974656d2e722e536b752c636f72726563743a66616c73652c636f7272656374696f6e3a747275652c726561736f6e3a22757365725f73656c65637465645f63616e646964617465222c61743a6e6577204461746528292e746f49534f537472696e6728292c656e67696e653a227633227d293b0a202072656e64657242657374286974656d2c6c617374526573756c7473293b0a2020636f6e737420703d646f63756d656e742e676574456c656d656e7442794964282270616e656c22293b0a2020636f6e737420616374696f6e733d702e717565727953656c6563746f7228222e616374696f6e7322293b0a2020696628616374696f6e73297b616374696f6e732e696e7365727441646a6163656e7448544d4c28226265666f7265626567696e222c273c64697620636c6173733d226e6f746522207374796c653d22746578742d616c69676e3a6c6566743b6d617267696e2d746f703a31327078223e436f7272656374696f6e20736176656420e2809420746869732073656c656374696f6e2077696c6c2062652075736564206173206c6561726e696e6720646174612e3c2f6469763e27293b7d0a7d0a').decode()
           if marker not in s:
               raise SystemExit('Could not find insertion marker')
           s = s.replace(marker, addition + marker, 1)
           p.write_text(s, encoding='utf-8')
-
+          PY
       - name: Commit patch
         run: |
           git config user.name 'github-actions[bot]'
