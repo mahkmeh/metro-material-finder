@@ -1,0 +1,7 @@
+{
+  "name": "metro-material-finder",
+  "private": true,
+  "dependencies": {
+    "@vercel/blob": "^2.6.1"
+  }
+}
