@@ -146,7 +146,7 @@ function rank(p){return materials.map((r,i)=>{const m=match(r,p);return {r,i,s:m
 function renderBest(item,results){
  if(!item){document.getElementById("panel").innerHTML='<div class="card"><div class="eyebrow">No clear match</div><h2>I need a little more information.</h2><p class="muted">Try adding the grade, size, thickness, finish or schedule.</p></div>';return}
  const r=item.r;const attrs=["Category","Sub Category","Grade","Finish","Material Type","Thickness","Width","Length","Diameter","Outer Diameter","Inner Diameter","Nominal Bore","Schedule","Material Size"].filter(k=>r[k]!==""&&r[k]!==null).slice(0,9).map(k=>`<div class="attr"><b>${k}</b><span>${esc(r[k])}</span></div>`).join("");
- document.getElementById("panel").innerHTML=`<div class="card"><div class="eyebrow">${item.s>=150?"Confident match":"Possible match"}</div><h2>${esc(r.Name)}</h2><div class="sku">SKU · ${esc(r.Sku||"—")}</div><div class="parsed">${chips(parsed)}</div><div class="attrs">${attrs}</div><div class="actions"><button class="yes" onclick="correct(${item.i})">✓ Correct</button><button class="no" onclick="showFeedback(${item.i})">✕ Wrong</button></div>${results.slice(1,4).map(x=>{const idx=lastResults.findIndex(y=>y.i===x.i);return `<div class="candidate"><div><b>${esc(x.r.Name)}</b><div class="sku">${esc(x.r.Sku||"")}</div></div><button onclick="renderBest(lastResults[${idx}],lastResults)">Choose</button></div>`}).join("")}</div>`
+ document.getElementById("panel").innerHTML=`<div class="card"><div class="eyebrow">${item.s>=150?"Confident match":"Possible match"}</div><h2>${esc(r.Name)}</h2><div class="sku">SKU · ${esc(r.Sku||"—")}</div><div class="parsed">${chips(parsed)}</div><div class="attrs">${attrs}</div><div class="actions"><button class="yes" onclick="correct(${item.i})">✓ Correct</button><button class="no" onclick="showFeedback(${item.i})">✕ Wrong</button></div>${results.slice(1,4).map(x=>{const idx=lastResults.findIndex(y=>y.i===x.i);return `<div class="candidate"><div><b>${esc(x.r.Name)}</b><div class="sku">${esc(x.r.Sku||"")}</div></div><button onclick="chooseCandidate(lastResults[${idx}])">Choose</button></div>`}).join("")}</div>`
 }
 function showBest(){if(lastResults.length)renderBest(lastResults[0],lastResults);else findMaterial()}
 function findMaterial(){const q=document.getElementById("q").value.trim();if(!q)return;lastQuery=q;parsed=parse(q);lastResults=rank(parsed);if(!lastResults.length){document.getElementById("panel").innerHTML=`<div class="card question"><div class="eyebrow">Need more information</div><h2>I couldn't identify a compatible material yet.</h2><div class="parsed">${chips(parsed)}</div><p class="muted">Add a size, thickness, finish, schedule or pipe basis if you know it.</p></div>`;return}if(clarify(parsed,lastResults))return;renderBest(lastResults[0],lastResults)}
@@ -166,6 +166,14 @@ function save(x){
 }
 function correct(i){save({query:lastQuery,parsed,material:materials[i],correct:true,at:new Date().toISOString()});document.getElementById("panel").innerHTML='<div class="card question"><div class="eyebrow">Saved</div><h2>Thanks — feedback recorded.</h2><p class="muted">The material master was not changed.</p></div>'}
 function wrong(i,reason){save({query:lastQuery,parsed,material:materials[i],correct:false,reason,at:new Date().toISOString()});document.getElementById("panel").innerHTML='<div class="card question"><div class="eyebrow">Feedback saved</div><h2>Got it.</h2><p class="muted">We’ll use this correction when the central learning layer is connected.</p></div>'}
+function chooseCandidate(item){
+  const predicted=lastResults&&lastResults.length?lastResults[0].r:null;
+  save({query:lastQuery,parsed,predictedMaterial:predicted,correctedMaterial:item.r,correctedSku:item.r&&item.r.Sku,correct:false,correction:true,reason:"user_selected_candidate",at:new Date().toISOString(),engine:"v3"});
+  renderBest(item,lastResults);
+  const p=document.getElementById("panel");
+  const actions=p.querySelector(".actions");
+  if(actions){actions.insertAdjacentHTML("beforebegin",'<div class="note" style="text-align:left;margin-top:12px">Correction saved — this selection will be used as learning data.</div>');}
+}
 function useExample(x){document.getElementById("q").value=x;findMaterial()}
 document.getElementById("q").addEventListener("keydown",e=>{if(e.key==="Enter")findMaterial()});
 
